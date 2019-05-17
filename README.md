@@ -49,3 +49,15 @@ default is 1).
 ```perl
 $bc->{nosubtitles} = 0;
 ```
+
+By default the report has two catalogs, one after the other: the first
+is ordered by author (or editor, etc.); the second, by Library of
+Congress number in the loc field.  To change the number of lists or
+their sorting, use the sorter slot.  It should be a list of sorter
+functions for the Perl sort function.  The default setting references
+the two provided sorter functions,
+
+```
+$bc->{sorters} = [\&BibCat::BibCat::standardSort,
+                  \&BibCat::BibCat::sortByLoC];
+```

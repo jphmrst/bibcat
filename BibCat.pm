@@ -12,6 +12,7 @@ use strict;
 
 use BibTeX::Parser;
 use IO::File;
+use Library::CallNumber::LC;
 
 sub new {
   my $class = shift;
@@ -31,6 +32,7 @@ sub new {
       dec => "December",
     },
     entries => [],
+    sorters => [\&standardSort, \&sortByLoC],
     tag => "loc",
     lines => 0,
     verbose => 0,
@@ -78,54 +80,61 @@ sub write {
     print OUT "\\begin{supertabular}{ll}\n";
   }
 
-  my @entries = sort sorter @{$self->{entries}};
-  my $lines = 0;
-  foreach my $en (@entries) {
-    my $loc = $en->field($self->{tag});
-    next unless defined $loc;
+  my @entries = @{$self->{entries}};
+  my $sorters = $self->{sorters};
 
-    print OUT "\\begin{tabular}{ll}\n"  if $maxLines>0 && $lines==0;
-    print OUT ('\texttt{', $loc, '}&');
-    my @authors = $en->author;
-    my @editors = $en->editor;
-    if (exists $authors[0]) {
-      print OUT ($authors[0]->last);
-      if ($#authors == 1) {
-        print OUT (' and ', $authors[1]->last);
-      } elsif ($#authors>1) {
-        print OUT (' \emph{et al.}');
+  foreach my $sortFn (@$sorters) {
+    @entries = sort $sortFn @entries;
+    my $lines = 0;
+    foreach my $en (@entries) {
+      my $loc = $en->field($self->{tag});
+      next unless defined $loc;
+
+      print OUT "\\begin{tabular}{ll}\n"  if $maxLines>0 && $lines==0;
+      print OUT ('\texttt{', $loc, '}&');
+      my @authors = $en->author;
+      my @editors = $en->editor;
+      if (exists $authors[0]) {
+        print OUT ($authors[0]->last);
+        if ($#authors == 1) {
+          print OUT (' and ', $authors[1]->last);
+        } elsif ($#authors>1) {
+          print OUT (' \emph{et al.}');
+        }
+        print OUT (', ');
+      } elsif (exists $editors[0]) {
+        print OUT ($editors[0]->last);
+        if ($#editors == 1) {
+          print OUT (' and ', $editors[1]->last);
+        } elsif ($#editors>1) {
+          print OUT (' \emph{et al.}');
+        }
+        print OUT (" (ed");
+        print OUT ("s") if $#editors>0;
+        print OUT (".), ");
+      } else {
       }
-      print OUT (', ');
-    } elsif (exists $editors[0]) {
-      print OUT ($editors[0]->last);
-      if ($#editors == 1) {
-        print OUT (' and ', $editors[1]->last);
-      } elsif ($#editors>1) {
-        print OUT (' \emph{et al.}');
+      my $title = $en->field("title");
+      $title =~ s/:.*$// if $nosubtitles;
+      $title =~ s/Proceedings of the /Proc.\\ /;
+      $title =~ s/(International )?Conference ((on|of|for)( the)? )?//;
+      print OUT ('\emph{', $title, "}, ", $en->field("year"));
+      print OUT ("\\\\\n");
+      $lines += 1;
+
+      if ($maxLines>0 && $lines==$maxLines) {
+        print OUT "\\end{tabular}\n\\clearpage\n\n";
+        $lines = 0;
       }
-      print OUT (" (ed");
-      print OUT ("s") if $#editors>0;
-      print OUT (".), ");
-    } else {
     }
-    my $title = $en->field("title");
-    $title =~ s/:.*$// if $nosubtitles;
-    $title =~ s/Proceedings of the /Proc.\\ /;
-    $title =~ s/(International )?Conference ((on|of|for)( the)? )?//;
-    print OUT ('\emph{', $title, "}, ", $en->field("year"));
-    print OUT ("\\\\\n");
-    $lines += 1;
 
-    if ($maxLines>0 && $lines==$maxLines) {
-      print OUT "\\end{tabular}\n\\clearpage\n\n";
-      $lines = 0;
+    if ($maxLines<1) {
+      print OUT "\\end{supertabular}{ll}\n";
+    } elsif ($maxLines>0 && $lines>0) {
+      print OUT "\\end{tabular}\n";
     }
-  }
 
-  if ($maxLines<1) {
-    print OUT "\\end{supertabular}{ll}\n";
-  } elsif ($maxLines>0 && $lines>0) {
-    print OUT "\\end{tabular}\n";
+    print OUT "\\clearpage\n";
   }
 
   print OUT "\\end{document}\n";
@@ -133,7 +142,7 @@ sub write {
   close OUT;
 }
 
-sub sorter { # args $a $b
+sub standardSort { # args $a $b
   my @authorsA = $a->author;
   my @authorsB = $b->author;
   if ($#authorsB > -1) {
@@ -167,6 +176,24 @@ sub sorter { # args $a $b
     }
   }
 
+}
+
+sub sortByLoC { # args $a $b
+  my $locA = $a->field("loc");
+  my $locB = $b->field("loc");
+
+  if (defined $locA && $locA ne '') {
+    if (defined $locB && $locB ne '') {
+      return Library::CallNumber::LC->normalize($locA)
+          cmp Library::CallNumber::LC->normalize($locB);
+    } else {
+      return -1;
+    }
+  } elsif (defined $locB && $locB ne '') {
+    return 1;
+  } else {
+    return standardSort;
+  }
 }
 
 1;
@@ -215,4 +242,14 @@ from the title.  To keep subtitles, set the nosubtitles slot to 0 (its
 default is 1).
 
   $bc->{nosubtitles} = 0;
+
+By default the report has two catalogs, one after the other: the first
+is ordered by author (or editor, etc.); the second, by Library of
+Congress number in the loc field.  To change the number of lists or
+their sorting, use the sorter slot.  It should be a list of sorter
+functions for the Perl sort function.  The default setting references
+the two provided sorter functions,
+
+  $bc->{sorters} = [\&BibCat::BibCat::standardSort,
+                    \&BibCat::BibCat::sortByLoC];
 
