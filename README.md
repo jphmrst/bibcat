@@ -32,3 +32,20 @@ $bc->{tag} = 'month';
 ```
 
 Set the slot verbose to a positive integer to get debugging output.
+
+By default the output uses the supertabular environment.  Sometimes
+supertabular does the wrong thing.  To use the tabular environment and
+explicit pagebreaks instead, set the lines field to a postive value of
+the number of lines that should be on one page.
+
+```
+$bc->{lines} = 60;
+```
+
+By default a colon and any characters following it will be removed
+from the title.  To keep subtitles, set the nosubtitles slot to 0 (its
+default is 1).
+
+```perl
+$bc->{nosubtitles} = 0;
+```

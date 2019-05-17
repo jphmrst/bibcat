@@ -32,7 +32,9 @@ sub new {
     },
     entries => [],
     tag => "loc",
-    verbose => 0
+    lines => 0,
+    verbose => 0,
+    nosubtitles => 1
   }, $class;
   $this->load(@_);
   return $this;
@@ -59,43 +61,75 @@ sub write {
   my $self = shift;
   my $fname = shift;
   print("Writing to $fname\n");
+  my $maxLines = $self->{lines};
+  my $nosubtitles = $self->{nosubtitles};
 
   open OUT, ">$fname";
   print OUT '
 \documentclass{article}
 \usepackage{supertabular}
-\usepackage[margin=0.5in]{geometry}
+\usepackage[margin=0.3in,bottom=0.6in]{geometry}
+\parindent 0pt
+\parskip 0pt
 \begin{document}
-\begin{supertabular}{ll}
 ';
 
+  if ($maxLines<1) {
+    print OUT "\\begin{supertabular}{ll}\n";
+  }
+
   my @entries = sort sorter @{$self->{entries}};
+  my $lines = 0;
   foreach my $en (@entries) {
     my $loc = $en->field($self->{tag});
     next unless defined $loc;
+
+    print OUT "\\begin{tabular}{ll}\n"  if $maxLines>0 && $lines==0;
     print OUT ('\texttt{', $loc, '}&');
     my @authors = $en->author;
     my @editors = $en->editor;
     if (exists $authors[0]) {
       print OUT ($authors[0]->last);
-      print OUT (' \emph{et al.}') if $#authors>0;
+      if ($#authors == 1) {
+        print OUT (' and ', $authors[1]->last);
+      } elsif ($#authors>1) {
+        print OUT (' \emph{et al.}');
+      }
       print OUT (', ');
     } elsif (exists $editors[0]) {
       print OUT ($editors[0]->last);
-      print OUT (' \emph{et al.}') if $#editors>0;
+      if ($#editors == 1) {
+        print OUT (' and ', $editors[1]->last);
+      } elsif ($#editors>1) {
+        print OUT (' \emph{et al.}');
+      }
       print OUT (" (ed");
       print OUT ("s") if $#editors>0;
       print OUT (".), ");
     } else {
     }
     my $title = $en->field("title");
+    $title =~ s/:.*$// if $nosubtitles;
     $title =~ s/Proceedings of the /Proc.\\ /;
     $title =~ s/(International )?Conference ((on|of|for)( the)? )?//;
     print OUT ('\emph{', $title, "}, ", $en->field("year"));
     print OUT ("\\\\\n");
+    $lines += 1;
+
+    if ($maxLines>0 && $lines==$maxLines) {
+      print OUT "\\end{tabular}\n\\clearpage\n\n";
+      $lines = 0;
+    }
   }
 
-  print OUT "\\end{supertabular}\n\\end{document}\n";
+  if ($maxLines<1) {
+    print OUT "\\end{supertabular}{ll}\n";
+  } elsif ($maxLines>0 && $lines>0) {
+    print OUT "\\end{tabular}\n";
+  }
+
+  print OUT "\\end{document}\n";
+
   close OUT;
 }
 
@@ -168,4 +202,17 @@ column:
   $bc->{tag} = 'month';
 
 Set the slot verbose to a positive integer to get debugging output.
+
+By default the output uses the supertabular environment.  Sometimes
+supertabular does the wrong thing.  To use the tabular environment and
+explicit pagebreaks instead, set the lines field to a postive value of
+the number of lines that should be on one page.
+
+  $bc->{lines} = 60;
+
+By default a colon and any characters following it will be removed
+from the title.  To keep subtitles, set the nosubtitles slot to 0 (its
+default is 1).
+
+  $bc->{nosubtitles} = 0;
 
