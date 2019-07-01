@@ -59,6 +59,108 @@ sub load {
   }
 }
 
+sub fontsize {
+  my $self = shift;
+  my $arg = shift;
+
+  if (defined $arg) {
+    $self->{fontsize} = $arg;
+  } else {
+    my $stored = $self->{fontsize};
+    if (defined $stored) {
+      return $stored;
+    } else {
+      return 10;
+    }
+  }
+}
+
+sub pagestyle {
+  my $self = shift;
+  my $arg = shift;
+
+  if (defined $arg) {
+    $self->{pagestyle} = $arg;
+  } elsif (defined $self->{pagestyle}) {
+    return $self->{pagestyle};
+  } else {
+    return "plain";
+  }
+}
+
+sub margin {
+  my $self = shift;
+  my $arg = shift;
+
+  if (defined $arg) {
+    $self->{margin} = $arg;
+  } elsif (defined $self->{margin}) {
+    return $self->{margin};
+  } else {
+    return "0.3in";
+  }
+}
+
+sub rightMargin {
+  my $self = shift;
+  my $arg = shift;
+
+  if (defined $arg) {
+    $self->{rightMargin} = $arg;
+  } else {
+    return $self->{rightMargin};
+  }
+}
+
+sub leftMargin {
+  my $self = shift;
+  my $arg = shift;
+
+  if (defined $arg) {
+    $self->{leftMargin} = $arg;
+  } else {
+    return $self->{leftMargin};
+  }
+}
+
+sub bottomMargin {
+  my $self = shift;
+  my $arg = shift;
+
+  if (defined $arg) {
+    $self->{bottomMargin} = $arg;
+  } else {
+    return $self->{bottomMargin};
+  }
+}
+
+sub topMargin {
+  my $self = shift;
+  my $arg = shift;
+
+  if (defined $arg) {
+    $self->{topMargin} = $arg;
+  } else {
+    return $self->{topMargin};
+  }
+}
+
+sub linesep {
+  my $self = shift;
+  my $arg = shift;
+
+  if (defined $arg) {
+    $self->{linesep} = $arg;
+  } else {
+    my $stored = $self->{linesep};
+    if (defined $stored) {
+      return $stored;
+    } else {
+      return 12;
+    }
+  }
+}
+
 sub write {
   my $self = shift;
   my $fname = shift;
@@ -70,10 +172,17 @@ sub write {
   print OUT '
 \documentclass{article}
 \usepackage{supertabular}
-\usepackage[margin=0.3in,bottom=0.6in]{geometry}
+\usepackage[margin=', $self->margin;
+  print OUT ',right=', $self->rightMargin    if defined $self->rightMargin;
+  print OUT ',left=', $self->leftMargin      if defined $self->leftMargin;
+  print OUT ',bottom=', $self->bottomMargin  if defined $self->bottomMargin;
+  print OUT ',top=', $self->topMargin        if defined $self->topMargin;
+  print OUT ']{geometry}
 \parindent 0pt
 \parskip 0pt
+\pagestyle{', $self->pagestyle, '}
 \begin{document}
+\fontsize{', $self->fontsize, '}{', $self->linesep, '}\selectfont
 ';
 
   if ($maxLines<1) {
